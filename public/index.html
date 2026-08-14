@@ -1,0 +1,1350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Fight Scorer</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<style>
+  :root{
+    --navy:#0B2C4D; --navy-deep:#081D33; --teal:#1381A8; --teal-light:#5BC4D8;
+    --amber:#F5A524; --cream:#F7F4EE; --grey:#4A5A68; --green:#2FA84F;
+    --yellow:#E0A11C; --red:#D64545; --white:#FFFFFF; --slate:#6B7A8F;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; font-family:Calibri,"Segoe UI",Arial,sans-serif; background:var(--cream);
+    color:var(--navy); padding:28px 32px 60px;
+  }
+  h1,h2,h3{font-family:Cambria,Georgia,serif; margin:0;}
+  .header{display:flex; align-items:center; gap:14px; margin-bottom:22px;}
+  .badge{
+    width:46px; height:46px; border-radius:50%; background:var(--amber);
+    display:flex; align-items:center; justify-content:center; flex-shrink:0;
+    box-shadow:0 3px 10px rgba(11,44,77,.25); position:relative;
+  }
+  .badge::after{content:""; position:absolute; width:16px; height:16px; background:var(--navy-deep);
+    clip-path:polygon(50% 0%, 100% 38%, 82% 100%, 18% 100%, 0% 38%); top:46%; left:50%; transform:translate(-50%,-50%);}
+  .header h1{font-size:24px; color:var(--navy);}
+  .header p{margin:2px 0 0; font-size:13px; color:var(--grey);}
+
+  .toprow{display:flex; gap:16px; flex-wrap:wrap; margin-bottom:16px;}
+  .field{flex:1; min-width:220px;}
+  .field label{display:block; font-size:12px; font-weight:bold; color:var(--grey); margin-bottom:6px; text-transform:uppercase; letter-spacing:.4px;}
+  .field label .hint{font-weight:normal; text-transform:none; color:#9a927c;}
+  .field input[type=text], .field textarea{
+    width:100%; padding:10px 12px; border:1px solid #DDD6C7; border-radius:8px;
+    font-size:14px; font-family:Calibri,sans-serif; background:var(--white); color:var(--navy);
+  }
+  .status-toggle{display:flex; gap:8px;}
+  .status-btn{
+    flex:1; padding:10px 8px; border-radius:8px; border:1px solid #DDD6C7; background:var(--white);
+    font-size:13px; font-weight:bold; cursor:pointer; color:var(--grey); transition:.15s;
+  }
+  .status-btn.active[data-v="fulfilled"]{background:var(--green); color:#fff; border-color:var(--green);}
+  .status-btn.active[data-v="partial"]{background:var(--yellow); color:#fff; border-color:var(--yellow);}
+  .status-btn.active[data-v="not"]{background:var(--red); color:#fff; border-color:var(--red);}
+
+  .fleet{display:flex; gap:8px; margin-bottom:20px; flex-wrap:wrap; align-items:center;}
+  .fleet button{
+    padding:7px 14px; border-radius:20px; border:1px solid #DDD6C7; background:var(--white);
+    font-size:12.5px; cursor:pointer; color:var(--grey);
+  }
+  .fleet button:hover{border-color:var(--teal); color:var(--teal);}
+
+  .ai-panel{
+    background:linear-gradient(135deg, var(--navy) 0%, #123a5e 100%); border-radius:14px;
+    padding:20px 22px; margin-bottom:20px; color:#fff; box-shadow:0 4px 16px rgba(11,44,77,.2);
+  }
+  .ai-panel-head{display:flex; align-items:center; gap:10px; margin-bottom:6px;}
+  .ai-panel-head .spark{width:26px; height:26px; flex-shrink:0;}
+  .ai-panel-head h3{font-size:17px; color:#fff;}
+  .ai-panel p.sub{margin:0 0 12px; font-size:13px; color:#B9CEE0;}
+  .ai-panel textarea{
+    width:100%; min-height:90px; padding:12px; border-radius:8px; border:1px solid #2A5578;
+    background:#0E3355; color:#fff; font-family:Calibri,sans-serif; font-size:14px; resize:vertical;
+  }
+  .ai-panel textarea::placeholder{color:#7C97AF;}
+  .ai-row{display:flex; justify-content:space-between; align-items:center; margin-top:12px; gap:12px; flex-wrap:wrap;}
+  .ai-btn{
+    background:var(--amber); color:var(--navy-deep); border:none; padding:11px 20px; border-radius:8px;
+    font-weight:bold; font-size:14px; cursor:pointer; display:flex; align-items:center; gap:8px;
+    white-space:nowrap;
+  }
+  .ai-btn:disabled{opacity:.6; cursor:progress;}
+  .ai-btn.small{padding:6px 12px; font-size:12px; background:transparent; color:var(--amber); border:1px solid var(--amber);}
+  .ai-note{font-size:12px; color:#8FAFC7;}
+
+  .section{
+    background:var(--white); border-radius:12px; padding:20px 22px; margin-bottom:18px;
+    box-shadow:0 2px 10px rgba(11,44,77,.08);
+  }
+  .section-head{display:flex; align-items:center; gap:10px; margin-bottom:16px;}
+  .section-head .dot{width:34px; height:34px; border-radius:50%; display:flex; align-items:center; justify-content:center; flex-shrink:0; color:#fff; font-family:Cambria,serif; font-weight:bold; font-size:15px;}
+  .section-head h2{font-size:18px; flex:1;}
+
+  .score-row{display:flex; align-items:center; gap:12px; padding:10px 0; border-bottom:1px solid #F0EBDD;}
+  .score-row:last-child{border-bottom:none;}
+  .score-row .name{flex:1; font-size:14.5px; font-weight:bold; color:var(--navy);}
+  .score-btns{display:flex; gap:6px;}
+  .score-btn{
+    padding:6px 12px; border-radius:16px; border:1px solid #DDD6C7; background:#FBFAF6;
+    font-size:12px; font-weight:bold; cursor:pointer; color:var(--grey);
+  }
+  .score-btn.sel-good{background:var(--green); border-color:var(--green); color:#fff;}
+  .score-btn.sel-avg{background:var(--yellow); border-color:var(--yellow); color:#fff;}
+  .score-btn.sel-bad{background:var(--red); border-color:var(--red); color:#fff;}
+
+  .cols{display:grid; grid-template-columns:1fr 1fr; gap:20px;}
+  @media (max-width:760px){.cols{grid-template-columns:1fr;}}
+  .col-label{font-size:12px; font-weight:bold; letter-spacing:.4px; text-transform:uppercase; margin-bottom:8px; display:flex; align-items:center; gap:6px;}
+  .col-label.good{color:var(--green);} .col-label.bad{color:var(--red);}
+
+  .chip{
+    display:inline-block; margin:0 6px 6px 0; padding:7px 12px; border-radius:8px;
+    border:1px solid #E4DECF; background:#FBFAF6; font-size:13px; cursor:pointer;
+    color:var(--grey); line-height:1.3; transition:.12s;
+  }
+  .chip:hover{border-color:var(--teal);}
+  .chip.selected.good{background:var(--green); border-color:var(--green); color:#fff;}
+  .chip.selected.bad{background:var(--red); border-color:var(--red); color:#fff;}
+
+  .add-row{display:flex; gap:8px; margin-top:10px;}
+  .add-row input{
+    flex:1; padding:8px 10px; border:1px dashed #C9C2AE; border-radius:8px; font-size:13px;
+    font-family:Calibri,sans-serif;
+  }
+  .add-row button{
+    padding:8px 14px; border-radius:8px; border:none; background:var(--navy); color:#fff;
+    font-size:13px; cursor:pointer; font-weight:bold;
+  }
+
+  .clash-grid{display:grid; grid-template-columns:1fr 1fr 1fr; gap:14px;}
+  @media (max-width:900px){.clash-grid{grid-template-columns:1fr;}}
+  .clash-field label{font-size:11px; font-weight:bold; letter-spacing:.5px; text-transform:uppercase; color:var(--teal); display:block; margin-bottom:6px;}
+  .clash-field textarea{
+    width:100%; min-height:80px; padding:10px; border:1px solid #E4DECF; border-radius:8px;
+    font-family:Calibri,sans-serif; font-size:13px; resize:vertical; color:var(--navy);
+  }
+
+  .verdict-box textarea{min-height:110px;}
+
+  .footer-bar{
+    position:sticky; bottom:0; margin-top:24px; background:var(--navy); border-radius:12px;
+    padding:16px 20px; display:flex; align-items:center; justify-content:space-between; gap:16px;
+    box-shadow:0 -4px 16px rgba(0,0,0,.15); flex-wrap:wrap;
+  }
+  .footer-bar .msg{color:#C9DCE8; font-size:13px;}
+  .footer-bar .actions{display:flex; gap:10px;}
+  .footer-bar button{
+    padding:11px 18px; border-radius:8px; border:none; cursor:pointer; font-size:14px; font-weight:bold;
+  }
+  #copyBtn{background:transparent; color:#fff; border:1px solid var(--teal-light) !important;}
+  #saveBtn{background:transparent; color:#fff; border:1px solid var(--teal-light) !important;}
+  #genBtn{background:var(--green); color:#fff;}
+  #copyBtn:active, #saveBtn:active, #genBtn:active{transform:scale(.98);}
+
+  .saved-list{font-size:12px; color:var(--grey);}
+  .saved-list select{padding:6px 8px; border-radius:6px; border:1px solid #DDD6C7; font-family:Calibri;}
+
+  .toast{
+    position:fixed; top:20px; left:50%; transform:translateX(-50%);
+    background:var(--navy-deep); color:#fff; padding:10px 20px; border-radius:8px;
+    font-size:13px; opacity:0; pointer-events:none; transition:opacity .25s; z-index:50; max-width:80%; text-align:center;
+  }
+  .toast.show{opacity:1;}
+
+  .spinner{width:14px; height:14px; border:2px solid rgba(11,44,77,.3); border-top-color:var(--navy-deep); border-radius:50%; animation:spin .7s linear infinite; display:inline-block;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="badge"></div>
+  <div>
+    <h1>Fight Scorer</h1>
+    <p>Tap points, score live, and let AI help structure your notes. Everything flows into the deck.</p>
+  </div>
+</div>
+
+<div class="toprow">
+  <div class="field">
+    <label>Problem / topic</label>
+    <input type="text" id="topic" placeholder="e.g. 5. The Cracking Towel">
+  </div>
+  <div class="field">
+    <label>Your name</label>
+    <input type="text" id="reviewerName" placeholder="e.g. Elvis, Apex Trio">
+  </div>
+  <div class="field">
+    <label>Task status</label>
+    <div class="status-toggle">
+      <button class="status-btn" data-v="fulfilled">Fulfilled</button>
+      <button class="status-btn" data-v="partial">Partial</button>
+      <button class="status-btn" data-v="not">Not met</button>
+    </div>
+  </div>
+</div>
+<div class="toprow">
+  <div class="field" style="flex:1 1 100%;">
+    <label>Problem statement <span class="hint">(shown on the Task slide)</span></label>
+    <textarea id="taskDescription" rows="2" placeholder="Paste the official problem statement here..."></textarea>
+  </div>
+</div>
+
+<div class="fleet">
+  <button id="newFightBtn">＋ New fight</button>
+  <div class="saved-list">
+    Load saved: <select id="savedSelect"><option value="">—</option></select>
+  </div>
+</div>
+
+<div class="ai-panel">
+  <div class="ai-panel-head">
+    <svg class="spark" viewBox="0 0 24 24" fill="none" stroke="#F5A524" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l1.8 5.3L19 9l-5.2 1.7L12 16l-1.8-5.3L5 9l5.2-1.7L12 2z"/><path d="M19 15l.9 2.6L22.5 18.5l-2.6.9L19 22l-.9-2.6-2.6-.9 2.6-.9L19 15z"/></svg>
+    <h3>Quick notes → auto-fill</h3>
+  </div>
+  <p class="sub">Jot rough observations as the fight happens. AI will sort them into Reporter / Opponent / Discussion points, suggest scores, and draft the clash + verdict — you review and adjust everything after.</p>
+  <textarea id="quickNotes" placeholder="e.g. Reporter explained resonance well, no error bars though. Opponent asked good clarifying q's but let the viscosity point go. Rep model = rigid pendulum, felt weak. Opp claimed speed alone matters, rep countered with fill level / resonance shift..."></textarea>
+  <div class="ai-row">
+    <span class="ai-note" id="aiNote">Runs through your own local server — nothing is sent until you click.</span>
+    <button class="ai-btn" id="autofillBtn">✨ Auto-fill from notes</button>
+  </div>
+</div>
+
+<div class="section" data-role="overview">
+  <div class="section-head">
+    <div class="dot" style="background:var(--teal)">4</div>
+    <h2>Overview &amp; scoring</h2>
+  </div>
+  <div id="scoreRows"></div>
+</div>
+
+<div class="section" data-role="reporter">
+  <div class="section-head">
+    <div class="dot" style="background:var(--teal)">R</div>
+    <h2>Reporter</h2>
+  </div>
+  <div class="cols">
+    <div>
+      <div class="col-label good">✓ Well done</div>
+      <div class="chips" data-pool="good"></div>
+      <div class="add-row"><input type="text" placeholder="Add your own..."><button>Add</button></div>
+    </div>
+    <div>
+      <div class="col-label bad">✕ Needs work</div>
+      <div class="chips" data-pool="bad"></div>
+      <div class="add-row"><input type="text" placeholder="Add your own..."><button>Add</button></div>
+    </div>
+  </div>
+</div>
+
+<div class="section" data-role="opponent">
+  <div class="section-head">
+    <div class="dot" style="background:var(--green)">O</div>
+    <h2>Opponent</h2>
+  </div>
+  <div class="cols">
+    <div>
+      <div class="col-label good">✓ Well done</div>
+      <div class="chips" data-pool="good"></div>
+      <div class="add-row"><input type="text" placeholder="Add your own..."><button>Add</button></div>
+    </div>
+    <div>
+      <div class="col-label bad">✕ Needs work</div>
+      <div class="chips" data-pool="bad"></div>
+      <div class="add-row"><input type="text" placeholder="Add your own..."><button>Add</button></div>
+    </div>
+  </div>
+</div>
+
+<div class="section" data-role="discussion">
+  <div class="section-head">
+    <div class="dot" style="background:var(--slate)">D</div>
+    <h2>Discussion</h2>
+  </div>
+  <div class="cols">
+    <div>
+      <div class="col-label good">✓ Well done</div>
+      <div class="chips" data-pool="good"></div>
+      <div class="add-row"><input type="text" placeholder="Add your own..."><button>Add</button></div>
+    </div>
+    <div>
+      <div class="col-label bad">✕ Needs work</div>
+      <div class="chips" data-pool="bad"></div>
+      <div class="add-row"><input type="text" placeholder="Add your own..."><button>Add</button></div>
+    </div>
+  </div>
+</div>
+
+<div class="section" data-role="clash">
+  <div class="section-head">
+    <div class="dot" style="background:var(--amber)">✕</div>
+    <h2>Clash in discussion</h2>
+  </div>
+  <div class="clash-grid">
+    <div class="clash-field"><label>Opponent's claim</label><textarea id="oppClaim" placeholder="What the opponent argued..."></textarea></div>
+    <div class="clash-field"><label>Reporter's response</label><textarea id="repResp" placeholder="How the reporter answered..."></textarea></div>
+    <div class="clash-field"><label>Your verdict</label><textarea id="verdict" placeholder="Who had it right, and why..."></textarea></div>
+  </div>
+</div>
+
+<div class="section" data-role="final">
+  <div class="section-head">
+    <div class="dot" style="background:var(--navy)">★</div>
+    <h2>Final verdict</h2>
+  </div>
+  <div class="verdict-box">
+    <textarea id="finalVerdict" placeholder="Overall recommendation and summary..."></textarea>
+  </div>
+  <div class="ai-row" style="margin-top:10px;">
+    <span class="ai-note">Drafts a summary from everything selected above.</span>
+    <button class="ai-btn small" id="polishBtn">✨ Draft from selections</button>
+  </div>
+</div>
+
+<div class="footer-bar">
+  <div class="msg" id="footerMsg">Fill in what you can, then generate the slides.</div>
+  <div class="actions">
+    <button id="saveBtn">Save fight</button>
+    <button id="copyBtn">Copy summary</button>
+    <button id="genBtn">⬇ Generate slides (.pptx)</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const POOLS = {
+  reporter: {
+    good: [
+      "Clear physical explanation of the mechanism",
+      "Theoretical model matched the experimental design",
+      "Systematic variation of key parameters",
+      "Well-labeled data visualization",
+      "Openly addressed the model's limitations",
+      "Clear theory → experiment → results → conclusion structure",
+      "Solid uncertainty / error analysis",
+      "Confident, well-paced delivery",
+    ],
+    bad: [
+      "No uncertainty analysis on key measurements",
+      "Model not justified against fuller theory",
+      "Missing quantitative results",
+      "No comparison between theory and experiment",
+      "Not enough variation of parameters",
+      "Unclear or rushed setup explanation",
+      "Background/intro ran too long",
+      "No real-world implications discussed",
+      "Results not shown with visualization",
+    ],
+  },
+  opponent: {
+    good: [
+      "Clear, well-targeted clarifying questions",
+      "Named the most significant weakness first",
+      "Proposed an alternative variable or explanation",
+      "Referenced relevant physics correctly",
+      "Constructive, respectful tone throughout",
+      "Followed up when an answer was incomplete",
+    ],
+    bad: [
+      "No prioritization of the most important issues",
+      "No quantitative counter-argument offered",
+      "Missed obvious flaws in the experimental design",
+      "Repeated points without pushing for a real answer",
+      "Preamble too long before the actual question",
+    ],
+  },
+  discussion: {
+    good: [
+      "Reached agreement on a key physical mechanism",
+      "Clarified an ambiguous definition or assumption",
+      "Reporter defended their position with sound reasoning",
+      "Opponent's pressure led to a genuinely better explanation",
+    ],
+    bad: [
+      "No consensus reached on the central disagreement",
+      "Reporter's answer stayed vague under pressure",
+      "Discussion drifted from the core physics question",
+      "Time mismanaged, cutting off a key exchange",
+    ],
+  },
+};
+
+const CRITERIA = [
+  { key: "theory", label: "Theory" },
+  { key: "experiment", label: "Experiment" },
+  { key: "results", label: "Results" },
+  { key: "agreement", label: "Agreement between theory and experiment" },
+  { key: "conclusions", label: "Conclusions" },
+];
+
+const state = {
+  topic: "", status: "", reviewerName: "", taskDescription: "",
+  scores: {},
+  reporter: { good: new Set(), bad: new Set() },
+  opponent: { good: new Set(), bad: new Set() },
+  discussion: { good: new Set(), bad: new Set() },
+  oppClaim: "", repResp: "", verdict: "", finalVerdict: "",
+};
+
+function renderScoreRows(){
+  const box = document.getElementById("scoreRows");
+  box.innerHTML = "";
+  CRITERIA.forEach(c=>{
+    const row = document.createElement("div");
+    row.className = "score-row";
+    const cur = state.scores[c.key];
+    row.innerHTML = `
+      <div class="name">${c.label}</div>
+      <div class="score-btns">
+        <button data-k="${c.key}" data-v="good" class="score-btn ${cur==='good'?'sel-good':''}">Very good</button>
+        <button data-k="${c.key}" data-v="avg" class="score-btn ${cur==='avg'?'sel-avg':''}">Average</button>
+        <button data-k="${c.key}" data-v="bad" class="score-btn ${cur==='bad'?'sel-bad':''}">Needs work</button>
+      </div>`;
+    box.appendChild(row);
+  });
+  box.querySelectorAll(".score-btn").forEach(btn=>{
+    btn.onclick = () => {
+      const k = btn.dataset.k, v = btn.dataset.v;
+      state.scores[k] = (state.scores[k] === v) ? null : v;
+      renderScoreRows();
+    };
+  });
+}
+
+function renderChips(){
+  document.querySelectorAll(".section[data-role]").forEach(section=>{
+    const role = section.dataset.role;
+    if(!POOLS[role]) return;
+    section.querySelectorAll(".chips").forEach(box=>{
+      const pool = box.dataset.pool;
+      box.innerHTML = "";
+      POOLS[role][pool].forEach(text=>{
+        const chip = document.createElement("span");
+        chip.className = "chip" + (state[role][pool].has(text) ? " selected " + pool : "");
+        chip.textContent = text;
+        chip.onclick = () => {
+          if(state[role][pool].has(text)) state[role][pool].delete(text);
+          else state[role][pool].add(text);
+          renderChips();
+        };
+        box.appendChild(chip);
+      });
+    });
+  });
+}
+
+document.querySelectorAll(".section[data-role] .add-row").forEach(row=>{
+  const section = row.closest(".section");
+  const role = section.dataset.role;
+  if(!POOLS[role]) return;
+  const box = row.previousElementSibling;
+  const pool = box.dataset.pool;
+  const input = row.querySelector("input");
+  const btn = row.querySelector("button");
+  const submit = () => {
+    const v = input.value.trim();
+    if(!v) return;
+    if(!POOLS[role][pool].includes(v)) POOLS[role][pool].push(v);
+    state[role][pool].add(v);
+    input.value = "";
+    renderChips();
+  };
+  btn.onclick = submit;
+  input.addEventListener("keydown", e=>{ if(e.key === "Enter") submit(); });
+});
+
+document.querySelectorAll(".status-btn").forEach(btn=>{
+  btn.onclick = () => {
+    state.status = btn.dataset.v;
+    document.querySelectorAll(".status-btn").forEach(b=>b.classList.remove("active"));
+    btn.classList.add("active");
+  };
+});
+
+document.getElementById("topic").addEventListener("input", e=> state.topic = e.target.value);
+document.getElementById("reviewerName").addEventListener("input", e=> state.reviewerName = e.target.value);
+document.getElementById("taskDescription").addEventListener("input", e=> state.taskDescription = e.target.value);
+document.getElementById("oppClaim").addEventListener("input", e=> state.oppClaim = e.target.value);
+document.getElementById("repResp").addEventListener("input", e=> state.repResp = e.target.value);
+document.getElementById("verdict").addEventListener("input", e=> state.verdict = e.target.value);
+document.getElementById("finalVerdict").addEventListener("input", e=> state.finalVerdict = e.target.value);
+
+function showToast(msg){
+  const t = document.getElementById("toast");
+  t.textContent = msg; t.classList.add("show");
+  setTimeout(()=>t.classList.remove("show"), 2400);
+}
+
+async function callAI(prompt){
+  const response = await fetch("/api/ai", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ prompt }),
+  });
+  const data = await response.json();
+  if(!response.ok) throw new Error(data.error || ("Server error " + response.status));
+  return data.text || "";
+}
+
+function parseJsonLoose(text){
+  const cleaned = text.replace(/```json|```/g, "").trim();
+  return JSON.parse(cleaned);
+}
+
+function addAndSelect(role, pool, items){
+  (items || []).forEach(t=>{
+    t = String(t).trim();
+    if(!t) return;
+    if(!POOLS[role][pool].includes(t)) POOLS[role][pool].push(t);
+    state[role][pool].add(t);
+  });
+}
+
+document.getElementById("autofillBtn").onclick = async () => {
+  const notes = document.getElementById("quickNotes").value.trim();
+  if(!notes){ showToast("Add some quick notes first"); return; }
+  const btn = document.getElementById("autofillBtn");
+  const original = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Structuring...';
+  try{
+    const prompt = `You are helping a student judge structure their live notes from a "Science Fights" (IYPT-style) physics debate round into a scoring template.
+
+Topic: ${state.topic || "(not given)"}
+Problem statement: ${state.taskDescription || "(not given)"}
+
+Raw judge notes (rough, possibly messy):
+"""
+${notes}
+"""
+
+Extract and organize ONLY what the notes actually support. Do not invent points that aren't implied. Respond with ONLY a raw JSON object (no markdown fences, no commentary) matching exactly this schema:
+{
+  "scores": {"theory": "good|avg|bad|null", "experiment": "good|avg|bad|null", "results": "good|avg|bad|null", "agreement": "good|avg|bad|null", "conclusions": "good|avg|bad|null"},
+  "reporter": {"good": ["short phrase", ...], "bad": ["short phrase", ...]},
+  "opponent": {"good": [...], "bad": [...]},
+  "discussion": {"good": [...], "bad": [...]},
+  "oppClaim": "one sentence or empty string",
+  "repResp": "one sentence or empty string",
+  "verdict": "one sentence verdict on the clash, or empty string",
+  "finalVerdict": "2-3 sentence overall recommendation, or empty string"
+}
+Keep each bullet phrase under 12 words. Leave arrays empty and strings empty where notes don't cover it. Use null for any score not mentioned.`;
+    const raw = await callAI(prompt);
+    const parsed = parseJsonLoose(raw);
+
+    if(parsed.scores) Object.entries(parsed.scores).forEach(([k,v])=>{ if(v && v !== "null") state.scores[k] = v; });
+    ["reporter","opponent","discussion"].forEach(role=>{
+      if(parsed[role]){
+        addAndSelect(role, "good", parsed[role].good);
+        addAndSelect(role, "bad", parsed[role].bad);
+      }
+    });
+    if(parsed.oppClaim) { state.oppClaim = parsed.oppClaim; document.getElementById("oppClaim").value = parsed.oppClaim; }
+    if(parsed.repResp) { state.repResp = parsed.repResp; document.getElementById("repResp").value = parsed.repResp; }
+    if(parsed.verdict) { state.verdict = parsed.verdict; document.getElementById("verdict").value = parsed.verdict; }
+    if(parsed.finalVerdict) { state.finalVerdict = parsed.finalVerdict; document.getElementById("finalVerdict").value = parsed.finalVerdict; }
+
+    renderScoreRows();
+    renderChips();
+    showToast("Auto-filled — review and adjust anything below");
+  }catch(e){
+    console.error(e);
+    showToast("AI auto-fill failed: " + e.message);
+  }finally{
+    btn.disabled = false;
+    btn.innerHTML = original;
+  }
+};
+
+document.getElementById("polishBtn").onclick = async () => {
+  const btn = document.getElementById("polishBtn");
+  const original = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Drafting...';
+  try{
+    const summarize = (role) => {
+      const g = [...state[role].good].join("; ") || "none noted";
+      const b = [...state[role].bad].join("; ") || "none noted";
+      return `Well done: ${g}. Needs work: ${b}.`;
+    };
+    const prompt = `Write a tight 2-3 sentence "final verdict" paragraph for a physics Science Fight review, in a judge's voice — direct, specific, no fluff.
+
+Topic: ${state.topic || "(not given)"}
+Reporter — ${summarize("reporter")}
+Opponent — ${summarize("opponent")}
+Discussion — ${summarize("discussion")}
+Clash: Opponent said "${state.oppClaim || "(n/a)"}"; Reporter said "${state.repResp || "(n/a)"}"; judge's take: "${state.verdict || "(n/a)"}"
+
+Respond with ONLY the paragraph text, no preamble, no quotes around it.`;
+    const raw = await callAI(prompt);
+    state.finalVerdict = raw.trim();
+    document.getElementById("finalVerdict").value = state.finalVerdict;
+    showToast("Draft ready — edit as needed");
+  }catch(e){
+    console.error(e);
+    showToast("AI draft failed: " + e.message);
+  }finally{
+    btn.disabled = false;
+    btn.innerHTML = original;
+  }
+};
+
+function buildSummary(){
+  const statusLabel = {fulfilled:"Task fulfilled", partial:"Task partially fulfilled", not:"Task not fulfilled"}[state.status] || "[not set]";
+  const lines = [];
+  lines.push(`TOPIC: ${state.topic || "[not set]"}`);
+  lines.push(`REVIEWER: ${state.reviewerName || "[not set]"}`);
+  lines.push(`TASK STATUS: ${statusLabel}`);
+  lines.push("");
+  lines.push("SCORES");
+  CRITERIA.forEach(c=> lines.push(`- ${c.label}: ${state.scores[c.key] || "not scored"}`));
+  lines.push("");
+  ["reporter","opponent","discussion"].forEach(role=>{
+    lines.push(role.toUpperCase());
+    lines.push("Well done:");
+    (state[role].good.size ? [...state[role].good] : ["(none selected)"]).forEach(t=>lines.push(`- ${t}`));
+    lines.push("Needs work:");
+    (state[role].bad.size ? [...state[role].bad] : ["(none selected)"]).forEach(t=>lines.push(`- ${t}`));
+    lines.push("");
+  });
+  lines.push("CLASH IN DISCUSSION");
+  lines.push(`Opponent: ${state.oppClaim || "[not set]"}`);
+  lines.push(`Reporter: ${state.repResp || "[not set]"}`);
+  lines.push(`Verdict: ${state.verdict || "[not set]"}`);
+  lines.push("");
+  lines.push("FINAL VERDICT");
+  lines.push(state.finalVerdict || "[not set]");
+  return lines.join("\n");
+}
+
+document.getElementById("copyBtn").onclick = async () => {
+  const text = buildSummary();
+  try{
+    await navigator.clipboard.writeText(text);
+    showToast("Copied to clipboard");
+  }catch(e){
+    showToast("Copy failed — select and copy manually");
+  }
+};
+
+function slug(s){ return (s||"untitled").toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/(^-|-$)/g,""); }
+
+async function refreshSavedList(){
+  const sel = document.getElementById("savedSelect");
+  sel.innerHTML = '<option value="">—</option>';
+  try{
+    const res = await window.storage.list("fight:");
+    if(res && res.keys){
+      res.keys.forEach(k=>{
+        const opt = document.createElement("option");
+        opt.value = k;
+        opt.textContent = k.replace("fight:", "");
+        sel.appendChild(opt);
+      });
+    }
+  }catch(e){}
+}
+
+document.getElementById("saveBtn").onclick = async () => {
+  const key = "fight:" + slug(state.topic);
+  const payload = {
+    topic: state.topic, status: state.status, reviewerName: state.reviewerName, taskDescription: state.taskDescription,
+    scores: state.scores,
+    reporter: {good:[...state.reporter.good], bad:[...state.reporter.bad]},
+    opponent: {good:[...state.opponent.good], bad:[...state.opponent.bad]},
+    discussion: {good:[...state.discussion.good], bad:[...state.discussion.bad]},
+    oppClaim: state.oppClaim, repResp: state.repResp, verdict: state.verdict, finalVerdict: state.finalVerdict,
+  };
+  try{
+    await window.storage.set(key, JSON.stringify(payload));
+    showToast("Saved");
+    refreshSavedList();
+  }catch(e){ showToast("Save failed"); }
+};
+
+document.getElementById("savedSelect").onchange = async (e) => {
+  const key = e.target.value;
+  if(!key) return;
+  try{
+    const res = await window.storage.get(key);
+    if(!res) return;
+    const p = JSON.parse(res.value);
+    state.topic = p.topic || ""; state.status = p.status || "";
+    state.reviewerName = p.reviewerName || ""; state.taskDescription = p.taskDescription || "";
+    state.scores = p.scores || {};
+    ["reporter","opponent","discussion"].forEach(role=>{
+      state[role].good = new Set(p[role]?.good || []);
+      state[role].bad = new Set(p[role]?.bad || []);
+      (p[role]?.good || []).forEach(t=>{ if(!POOLS[role].good.includes(t)) POOLS[role].good.push(t); });
+      (p[role]?.bad || []).forEach(t=>{ if(!POOLS[role].bad.includes(t)) POOLS[role].bad.push(t); });
+    });
+    state.oppClaim = p.oppClaim || ""; state.repResp = p.repResp || ""; state.verdict = p.verdict || "";
+    state.finalVerdict = p.finalVerdict || "";
+    document.getElementById("topic").value = state.topic;
+    document.getElementById("reviewerName").value = state.reviewerName;
+    document.getElementById("taskDescription").value = state.taskDescription;
+    document.getElementById("oppClaim").value = state.oppClaim;
+    document.getElementById("repResp").value = state.repResp;
+    document.getElementById("verdict").value = state.verdict;
+    document.getElementById("finalVerdict").value = state.finalVerdict;
+    document.querySelectorAll(".status-btn").forEach(b=>b.classList.toggle("active", b.dataset.v === state.status));
+    renderScoreRows();
+    renderChips();
+    showToast("Loaded");
+  }catch(e){ showToast("Load failed"); }
+};
+
+document.getElementById("newFightBtn").onclick = () => {
+  state.topic = ""; state.status = ""; state.reviewerName = ""; state.taskDescription = ""; state.scores = {};
+  ["reporter","opponent","discussion"].forEach(role=>{ state[role].good.clear(); state[role].bad.clear(); });
+  state.oppClaim = ""; state.repResp = ""; state.verdict = ""; state.finalVerdict = "";
+  document.getElementById("topic").value = "";
+  document.getElementById("reviewerName").value = "";
+  document.getElementById("taskDescription").value = "";
+  document.getElementById("oppClaim").value = "";
+  document.getElementById("repResp").value = "";
+  document.getElementById("verdict").value = "";
+  document.getElementById("finalVerdict").value = "";
+  document.getElementById("quickNotes").value = "";
+  document.querySelectorAll(".status-btn").forEach(b=>b.classList.remove("active"));
+  renderScoreRows();
+  renderChips();
+};
+
+// ============ PPTX GENERATOR (embedded below, vector-only icons) ============
+// Minimal OOXML .pptx builder — vector-only icons (zero font/glyph dependency), no external deps besides JSZip.
+// Produces a 10-slide "Fight Scorer" deck.
+
+const EMU_PER_IN = 914400;
+const emu = (inches) => Math.round(inches * EMU_PER_IN);
+
+const PAL = {
+  NAVY: "0B2C4D", NAVY_DEEP: "081D33", TEAL: "1381A8", TEAL_LIGHT: "5BC4D8",
+  AMBER: "F5A524", CREAM: "F7F4EE", GREY: "4A5A68", WHITE: "FFFFFF",
+  GREEN: "2FA84F", YELLOW: "E0A11C", RED: "D64545", SLATE: "6B7A8F",
+};
+
+function esc(s) {
+  return String(s == null ? "" : s)
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;").replace(/'/g, "&apos;");
+}
+
+let _id = 1;
+function nextId() { return ++_id; }
+
+// ---------- basic shapes ----------
+function shapeRect({ x, y, w, h, fill, rounded, lineColor, lineW, alpha }) {
+  const id = nextId();
+  const geom = rounded
+    ? `<a:prstGeom prst="roundRect"><a:avLst><a:gd name="adj" fmla="val ${Math.min(50000, Math.round((rounded / Math.min(w, h)) * 100000))}"/></a:avLst></a:prstGeom>`
+    : `<a:prstGeom prst="rect"><a:avLst/></a:prstGeom>`;
+  const alphaTag = alpha != null ? `<a:alpha val="${Math.round(alpha * 1000)}"/>` : "";
+  const line = lineColor
+    ? `<a:ln w="${emu(lineW || 0.01)}"><a:solidFill><a:srgbClr val="${lineColor}"/></a:solidFill></a:ln>`
+    : `<a:ln><a:noFill/></a:ln>`;
+  return `<p:sp><p:nvSpPr><p:cNvPr id="${id}" name="Shape ${id}"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr>
+<p:spPr><a:xfrm><a:off x="${emu(x)}" y="${emu(y)}"/><a:ext cx="${emu(w)}" cy="${emu(h)}"/></a:xfrm>${geom}
+<a:solidFill><a:srgbClr val="${fill}">${alphaTag}</a:srgbClr></a:solidFill>${line}</p:spPr>
+<p:txBody><a:bodyPr/><a:p/></p:txBody></p:sp>`;
+}
+
+function shapeEllipse({ x, y, w, h, fill, lineColor, lineW, alpha, rotDeg }) {
+  const id = nextId();
+  const alphaTag = alpha != null ? `<a:alpha val="${Math.round(alpha * 1000)}"/>` : "";
+  const line = lineColor
+    ? `<a:ln w="${emu(lineW || 0.01)}"><a:solidFill><a:srgbClr val="${lineColor}"/></a:solidFill></a:ln>`
+    : `<a:ln><a:noFill/></a:ln>`;
+  const rot = rotDeg ? ` rot="${Math.round(rotDeg * 60000)}"` : "";
+  return `<p:sp><p:nvSpPr><p:cNvPr id="${id}" name="Ellipse ${id}"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr>
+<p:spPr><a:xfrm${rot}><a:off x="${emu(x)}" y="${emu(y)}"/><a:ext cx="${emu(w)}" cy="${emu(h)}"/></a:xfrm>
+<a:prstGeom prst="ellipse"><a:avLst/></a:prstGeom>
+<a:solidFill><a:srgbClr val="${fill}">${alphaTag}</a:srgbClr></a:solidFill>${line}</p:spPr>
+<p:txBody><a:bodyPr/><a:p/></p:txBody></p:sp>`;
+}
+
+function shapePreset(prst, { x, y, w, h, fill, lineColor, lineW, rotDeg }) {
+  const id = nextId();
+  const line = lineColor
+    ? `<a:ln w="${emu(lineW || 0.01)}"><a:solidFill><a:srgbClr val="${lineColor}"/></a:solidFill></a:ln>`
+    : `<a:ln><a:noFill/></a:ln>`;
+  const rot = rotDeg ? ` rot="${Math.round(rotDeg * 60000)}"` : "";
+  return `<p:sp><p:nvSpPr><p:cNvPr id="${id}" name="Preset ${id}"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr>
+<p:spPr><a:xfrm${rot}><a:off x="${emu(x)}" y="${emu(y)}"/><a:ext cx="${emu(w)}" cy="${emu(h)}"/></a:xfrm>
+<a:prstGeom prst="${prst}"><a:avLst/></a:prstGeom>
+<a:solidFill><a:srgbClr val="${fill}"/></a:solidFill>${line}</p:spPr>
+<p:txBody><a:bodyPr/><a:p/></p:txBody></p:sp>`;
+}
+
+// custom vector path icon — zero font dependency. pts: array of subpaths, each an array of [x,y] in a 0-100 box.
+function pathIcon({ x, y, w, h, pts, stroke, weight = 8, fill = null, closed = false }) {
+  const id = nextId();
+  const sub = pts.map(sp => {
+    const [first, ...rest] = sp;
+    const move = `<a:moveTo><a:pt x="${first[0]}" y="${first[1]}"/></a:moveTo>`;
+    const lines = rest.map(p => `<a:lnTo><a:pt x="${p[0]}" y="${p[1]}"/></a:lnTo>`).join("");
+    return move + lines + (closed ? "<a:close/>" : "");
+  }).join("");
+  const fillTag = fill ? `<a:solidFill><a:srgbClr val="${fill}"/></a:solidFill>` : `<a:noFill/>`;
+  const lnTag = stroke ? `<a:ln w="${Math.round(weight * 12700)}" cap="rnd"><a:solidFill><a:srgbClr val="${stroke}"/></a:solidFill><a:round/></a:ln>` : `<a:ln><a:noFill/></a:ln>`;
+  return `<p:sp><p:nvSpPr><p:cNvPr id="${id}" name="Icon ${id}"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr>
+<p:spPr><a:xfrm><a:off x="${emu(x)}" y="${emu(y)}"/><a:ext cx="${emu(w)}" cy="${emu(h)}"/></a:xfrm>
+<a:custGeom><a:avLst/><a:gdLst/><a:ahLst/><a:cxnLst/><a:rect l="0" t="0" r="0" b="0"/>
+<a:pathLst><a:path w="100" h="100">${sub}</a:path></a:pathLst></a:custGeom>
+${fillTag}${lnTag}</p:spPr>
+<p:txBody><a:bodyPr/><a:p/></p:txBody></p:sp>`;
+}
+
+// ---------- text ----------
+function textBox({ x, y, w, h, runs, size = 14, color = "000000", bold = false, italic = false,
+  align = "l", valign = "t", fontFace = "Calibri", lnSpcPct = 100 }) {
+  const id = nextId();
+  const paragraphs = Array.isArray(runs) ? runs : [{ text: runs, bold, color, size, italic }];
+  const pXml = paragraphs.map(p => {
+    const items = Array.isArray(p) ? p : [p];
+    const rXml = items.map(r => {
+      const b = r.bold ? ' b="1"' : "";
+      const i = r.italic ? ' i="1"' : "";
+      const sz = Math.round((r.size || size) * 100);
+      const clr = r.color || color;
+      const ff = r.fontFace || fontFace;
+      return `<a:r><a:rPr lang="en-US" sz="${sz}"${b}${i} dirty="0"><a:solidFill><a:srgbClr val="${clr}"/></a:solidFill><a:latin typeface="${ff}"/></a:rPr><a:t>${esc(r.text)}</a:t></a:r>`;
+    }).join("");
+    const al = align === "ctr" ? "ctr" : align === "r" ? "r" : "l";
+    return `<a:p><a:pPr algn="${al}"><a:lnSpc><a:spcPct val="${lnSpcPct * 1000}"/></a:lnSpc><a:buNone/></a:pPr>${rXml}</a:p>`;
+  }).join("");
+  const anchor = valign === "middle" ? "ctr" : valign === "bottom" ? "b" : "t";
+  return `<p:sp><p:nvSpPr><p:cNvPr id="${id}" name="TextBox ${id}"/><p:cNvSpPr txBox="1"/><p:nvPr/></p:nvSpPr>
+<p:spPr><a:xfrm><a:off x="${emu(x)}" y="${emu(y)}"/><a:ext cx="${emu(w)}" cy="${emu(h)}"/></a:xfrm>
+<a:prstGeom prst="rect"><a:avLst/></a:prstGeom><a:noFill/></p:spPr>
+<p:txBody><a:bodyPr wrap="square" anchor="${anchor}" lIns="0" tIns="0" rIns="0" bIns="0"><a:normAutofit/></a:bodyPr><a:lstStyle/>${pXml}</p:txBody></p:sp>`;
+}
+
+function bulletList({ x, y, w, h, items, color = PAL.GREY, size = 14, dotColor = null }) {
+  const list = items.length ? items : ["(none selected)"];
+  const id = nextId();
+  const pXml = list.map(t => {
+    const sz = Math.round(size * 100);
+    const c = dotColor || color;
+    return `<a:p><a:pPr marL="228600" indent="-228600"><a:lnSpc><a:spcPct val="130000"/></a:lnSpc><a:spcAft><a:spcPts val="600"/></a:spcAft><a:buClr><a:srgbClr val="${c}"/></a:buClr><a:buFont typeface="Arial"/><a:buChar char="&#8226;"/></a:pPr><a:r><a:rPr lang="en-US" sz="${sz}" dirty="0"><a:solidFill><a:srgbClr val="${color}"/></a:solidFill><a:latin typeface="Calibri"/></a:rPr><a:t>${esc(t)}</a:t></a:r></a:p>`;
+  }).join("");
+  return `<p:sp><p:nvSpPr><p:cNvPr id="${id}" name="List ${id}"/><p:cNvSpPr txBox="1"/><p:nvPr/></p:nvSpPr>
+<p:spPr><a:xfrm><a:off x="${emu(x)}" y="${emu(y)}"/><a:ext cx="${emu(w)}" cy="${emu(h)}"/></a:xfrm>
+<a:prstGeom prst="rect"><a:avLst/></a:prstGeom><a:noFill/></p:spPr>
+<p:txBody><a:bodyPr wrap="square" anchor="t" lIns="0" tIns="0" rIns="0" bIns="0"/><a:lstStyle/>${pXml}</p:txBody></p:sp>`;
+}
+
+// ---------- vector icon badges (guaranteed to render — no font/emoji dependency) ----------
+function badgeBg({ x, y, d, color }) {
+  return shapeEllipse({ x, y, w: d, h: d, fill: color });
+}
+
+function iconCheck({ x, y, d, color }) {
+  const pad = d * 0.26;
+  return pathIcon({ x: x + pad, y: y + pad, w: d - pad * 2, h: d - pad * 2, stroke: color, weight: d * 9, pts: [[[8, 52], [38, 78], [92, 15]]] });
+}
+function iconX({ x, y, d, color }) {
+  const pad = d * 0.28;
+  return pathIcon({ x: x + pad, y: y + pad, w: d - pad * 2, h: d - pad * 2, stroke: color, weight: d * 9, pts: [[[10, 10], [90, 90]], [[90, 10], [10, 90]]] });
+}
+function iconMonogram({ x, y, d, letter, color, size }) {
+  return textBox({ x, y: y - d * 0.03, w: d, h: d, runs: letter, size: size || d * 24, color, bold: true, align: "ctr", valign: "middle", fontFace: "Cambria" });
+}
+function iconTeardrop({ x, y, d, color }) {
+  const pad = d * 0.2;
+  return shapePreset("teardrop", { x: x + pad, y: y + pad, w: d - pad * 2, h: d - pad * 2, fill: color, rotDeg: 135 });
+}
+function iconTarget({ x, y, d, color, bg }) {
+  const s1 = shapeEllipse({ x: x + d * 0.14, y: y + d * 0.14, w: d * 0.72, h: d * 0.72, fill: color });
+  const s2 = shapeEllipse({ x: x + d * 0.30, y: y + d * 0.30, w: d * 0.40, h: d * 0.40, fill: bg });
+  const s3 = shapeEllipse({ x: x + d * 0.42, y: y + d * 0.42, w: d * 0.16, h: d * 0.16, fill: color });
+  return s1 + s2 + s3;
+}
+function iconSun({ x, y, d, color }) {
+  const pad = d * 0.24;
+  return shapePreset("sun", { x: x + pad, y: y + pad, w: d - pad * 2, h: d - pad * 2, fill: color });
+}
+function iconGear({ x, y, d, color }) {
+  const pad = d * 0.16;
+  return shapePreset("gear6", { x: x + pad, y: y + pad, w: d - pad * 2, h: d - pad * 2, fill: color });
+}
+function iconBars({ x, y, d, color }) {
+  const bw = d * 0.15, gap = d * 0.10, base = y + d * 0.75;
+  const heights = [0.30, 0.5, 0.38];
+  let bx = x + d * 0.22;
+  let out = "";
+  heights.forEach(hf => {
+    const bh = d * hf;
+    out += shapeRect({ x: bx, y: base - bh, w: bw, h: bh, fill: color, rounded: bw * 0.25 });
+    bx += bw + gap;
+  });
+  return out;
+}
+function iconVenn({ x, y, d, color }) {
+  const r = d * 0.42;
+  const s1 = shapeEllipse({ x: x + d * 0.10, y: y + d * 0.29, w: r, h: r, fill: color, alpha: 65 });
+  const s2 = shapeEllipse({ x: x + d * 0.30, y: y + d * 0.29, w: r, h: r, fill: color, alpha: 65 });
+  return s1 + s2;
+}
+function iconFlag({ x, y, d, color }) {
+  const pole = shapeRect({ x: x + d * 0.28, y: y + d * 0.18, w: d * 0.06, h: d * 0.64, fill: color });
+  const flag = shapePreset("triangle", { x: x + d * 0.34, y: y + d * 0.20, w: d * 0.42, h: d * 0.30, fill: color, rotDeg: 90 });
+  return pole + flag;
+}
+function iconClash({ x, y, d, color }) {
+  const t1 = shapePreset("triangle", { x: x + d * 0.12, y: y + d * 0.30, w: d * 0.38, h: d * 0.38, fill: color, rotDeg: 90 });
+  const t2 = shapePreset("triangle", { x: x + d * 0.50, y: y + d * 0.30, w: d * 0.38, h: d * 0.38, fill: color, rotDeg: 270 });
+  return t1 + t2;
+}
+function iconStar({ x, y, d, color }) {
+  const pad = d * 0.14;
+  return shapePreset("star5", { x: x + pad, y: y + pad, w: d - pad * 2, h: d - pad * 2, fill: color });
+}
+
+// ---------- slide chrome ----------
+function decor(tint = PAL.TEAL_LIGHT) {
+  return shapeEllipse({ x: 11.55, y: 6.05, w: 2.6, h: 2.6, fill: tint, alpha: 12 })
+    + shapeEllipse({ x: 12.5, y: 5.25, w: 1.35, h: 1.35, fill: PAL.AMBER, alpha: 10 });
+}
+function decorCorner() {
+  return shapeEllipse({ x: -1.6, y: -2.0, w: 5.2, h: 5.2, fill: PAL.TEAL, alpha: 22 })
+    + shapeEllipse({ x: -0.6, y: -0.9, w: 2.6, h: 2.6, fill: PAL.TEAL_LIGHT, alpha: 18 });
+}
+function pageFoot(idx, total, label) {
+  return textBox({ x: 0.6, y: 7.12, w: 6, h: 0.3, runs: `${label}   \u00B7   ${idx} / ${total}`, size: 10, color: "B9AE96" });
+}
+function pageFootDark(idx, total, label) {
+  return textBox({ x: 0.6, y: 7.12, w: 6, h: 0.3, runs: `${label}   \u00B7   ${idx} / ${total}`, size: 10, color: "6E88A3" });
+}
+
+// big faint numeral watermark — gives every slide a strong graphic identity
+function watermark(idx, opts = {}) {
+  const color = opts.color || PAL.WHITE;
+  const alpha = opts.alpha != null ? opts.alpha : 6;
+  return textBox({
+    x: 8.6, y: 4.55, w: 4.6, h: 3.0, runs: String(idx).padStart(2, "0"),
+    size: 220, color, bold: true, fontFace: "Cambria", align: "r", valign: "middle",
+  }).replace('<a:solidFill><a:srgbClr val="' + color + '"/></a:solidFill>', `<a:solidFill><a:srgbClr val="${color}"><a:alpha val="${alpha * 1000}"/></a:srgbClr></a:solidFill>`);
+}
+
+function ratingColor(v) {
+  return v === "good" ? PAL.GREEN : v === "avg" ? PAL.YELLOW : v === "bad" ? PAL.RED : "C9C2AE";
+}
+function ratingLabel(v) {
+  return v === "good" ? "Very good" : v === "avg" ? "Average" : v === "bad" ? "Needs improvement" : "Not scored";
+}
+
+function slideXml(name, bgColor, bodyShapes) {
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<p:sld xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:cSld name="${esc(name)}"><p:bg><p:bgPr><a:solidFill><a:srgbClr val="${bgColor}"/></a:solidFill><a:effectLst/></p:bgPr></p:bg><p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/><a:chOff x="0" y="0"/><a:chExt cx="0" cy="0"/></a:xfrm></p:grpSpPr>
+${bodyShapes.join("\n")}
+</p:spTree></p:cSld><p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr><p:transition spd="slow" advClick="1"><p:fade/></p:transition></p:sld>`;
+}
+
+const TOTAL_SLIDES = 10;
+
+// ==================== 1. TITLE ====================
+function buildTitle(state) {
+  _id = 1;
+  const s = [];
+  s.push(decorCorner(), decor());
+  s.push(shapeRect({ x: 0, y: 0, w: 0.22, h: 7.5, fill: PAL.AMBER }));
+  s.push(badgeBg({ x: 0.85, y: 0.7, d: 1.3, color: PAL.AMBER }));
+  s.push(iconTeardrop({ x: 0.85, y: 0.7, d: 1.3, color: PAL.NAVY_DEEP }));
+  s.push(textBox({ x: 0.85, y: 2.25, w: 9, h: 0.5, runs: "SCIENCE FIGHTS  \u00B7  REVIEW", size: 17, color: PAL.TEAL_LIGHT, bold: true }));
+  s.push(textBox({ x: 0.82, y: 2.78, w: 11.3, h: 1.9, runs: state.topic || "[Problem title]", size: 52, color: PAL.WHITE, bold: true, fontFace: "Cambria", lnSpcPct: 102 }));
+  s.push(textBox({ x: 0.87, y: 4.25, w: 9, h: 0.5, runs: "Science Fights \u2014 Review", size: 19, color: "C9DCE8", italic: true }));
+  s.push(shapeRect({ x: 0.85, y: 5.75, w: 5.2, h: 1.3, fill: PAL.NAVY_DEEP, rounded: 0.15, lineColor: PAL.TEAL, lineW: 0.015 }));
+  s.push(shapeRect({ x: 0.85, y: 5.75, w: 0.09, h: 1.3, fill: PAL.AMBER }));
+  s.push(textBox({
+    x: 1.2, y: 5.9, w: 4.6, h: 1.0, valign: "middle", runs: [
+      [{ text: state.reviewerName || "[Your Name]", bold: true, color: PAL.WHITE, size: 19 }],
+      [{ text: "Reviewer", color: "9FB8CC", size: 14 }],
+    ],
+  }));
+  return slideXml("Title", PAL.NAVY, s);
+}
+
+// ==================== 2. AGENDA ====================
+function buildAgenda(state) {
+  _id = 1;
+  const s = [];
+  s.push(decorCorner(), decor());
+  s.push(shapeRect({ x: 0, y: 0, w: 0.22, h: 7.5, fill: PAL.TEAL }));
+  s.push(textBox({ x: 0.85, y: 0.55, w: 8, h: 0.8, runs: "What's inside", size: 34, color: PAL.WHITE, bold: true, fontFace: "Cambria" }));
+  const items = ["The task", "Overview & scoring", "Scorecard", "Reporter", "Opponent", "Discussion", "Clash in discussion", "Final verdict"];
+  const colW = 5.5;
+  items.forEach((t, i) => {
+    const col = i < 4 ? 0 : 1;
+    const row = i % 4;
+    const x = 0.85 + col * (colW + 0.35);
+    const y = 1.75 + row * 1.14;
+    s.push(shapeRect({ x, y, w: colW, h: 0.95, fill: PAL.NAVY_DEEP, rounded: 0.13, lineColor: PAL.TEAL, lineW: 0.012 }));
+    s.push(badgeBg({ x: x + 0.16, y: y + 0.145, d: 0.66, color: PAL.TEAL }));
+    s.push(iconMonogram({ x: x + 0.16, y: y + 0.145, d: 0.66, letter: String(i + 3), color: PAL.WHITE, size: 19 }));
+    s.push(textBox({ x: x + 1.02, y, w: colW - 1.2, h: 0.95, valign: "middle", runs: t, size: 17, color: PAL.WHITE, bold: true }));
+  });
+  s.push(pageFootDark(2, TOTAL_SLIDES, "Science Fights Review"));
+  return slideXml("Agenda", PAL.NAVY, s);
+}
+
+// ==================== 3. TASK ====================
+function buildTask(state) {
+  _id = 1;
+  const s = [];
+  s.push(decor());
+  s.push(shapeRect({ x: 0, y: 0, w: 0.22, h: 7.5, fill: PAL.AMBER }));
+  const statusColor = { fulfilled: PAL.GREEN, partial: PAL.YELLOW, not: PAL.RED }[state.status] || "C9C2AE";
+  const statusLabel = { fulfilled: "Task fulfilled", partial: "Task partially fulfilled", not: "Task not fulfilled" }[state.status] || "Not scored yet";
+  s.push(badgeBg({ x: 0.85, y: 0.5, d: 0.85, color: PAL.NAVY }));
+  s.push(iconTarget({ x: 0.85, y: 0.5, d: 0.85, color: PAL.WHITE, bg: PAL.NAVY }));
+  s.push(textBox({ x: 1.9, y: 0.5, w: 10.3, h: 0.9, valign: "middle", runs: state.topic || "[Problem title]", size: 29, color: PAL.NAVY, bold: true, fontFace: "Cambria" }));
+  s.push(shapeRect({ x: 0.85, y: 1.75, w: 7.35, h: 3.5, fill: PAL.WHITE, rounded: 0.13 }));
+  s.push(shapeRect({ x: 0.85, y: 1.75, w: 0.12, h: 3.5, fill: PAL.AMBER }));
+  s.push(textBox({ x: 1.35, y: 2.1, w: 6.65, h: 2.9, runs: state.taskDescription || "[Problem statement not set]", size: 17, color: PAL.GREY, lnSpcPct: 140 }));
+  s.push(shapeRect({ x: 8.5, y: 1.75, w: 3.9, h: 3.5, fill: PAL.NAVY, rounded: 0.13 }));
+  s.push(textBox({ x: 8.85, y: 2.15, w: 3.3, h: 0.4, runs: "Task status", size: 14, color: "9FB8CC" }));
+  s.push(shapeRect({ x: 8.85, y: 2.65, w: 3.2, h: 0.9, fill: statusColor, rounded: 0.15 }));
+  s.push(textBox({ x: 8.85, y: 2.65, w: 3.2, h: 0.9, valign: "middle", align: "ctr", runs: statusLabel, size: 16, color: PAL.WHITE, bold: true }));
+  s.push(pageFoot(3, TOTAL_SLIDES, state.topic || "Science Fights Review"));
+  return slideXml("Task", PAL.CREAM, s);
+}
+
+// ==================== 4. OVERVIEW (live-scored) ====================
+function buildOverview(state) {
+  _id = 1;
+  const s = [];
+  s.push(decor());
+  s.push(shapeRect({ x: 0, y: 0, w: 0.22, h: 7.5, fill: PAL.TEAL }));
+  s.push(textBox({ x: 0.85, y: 0.5, w: 8, h: 0.8, runs: "Overview", size: 34, color: PAL.NAVY, bold: true, fontFace: "Cambria" }));
+  const criteria = [
+    { key: "theory", t: "Theory", icon: iconSun },
+    { key: "experiment", t: "Experiment", icon: iconGear },
+    { key: "results", t: "Results", icon: iconBars },
+    { key: "agreement", t: "Agreement between theory and experiment", icon: iconVenn },
+    { key: "conclusions", t: "Conclusions", icon: iconFlag },
+  ];
+  let y = 1.75;
+  const scores = state.scores || {};
+  criteria.forEach(c => {
+    const rc = ratingColor(scores[c.key]);
+    s.push(shapeRect({ x: 0.85, y, w: 6.85, h: 0.82, fill: PAL.WHITE, rounded: 0.11 }));
+    s.push(shapeRect({ x: 0.85, y, w: 0.09, h: 0.82, fill: rc }));
+    s.push(badgeBg({ x: 1.06, y: y + 0.1, d: 0.62, color: rc }));
+    s.push(c.icon({ x: 1.06, y: y + 0.1, d: 0.62, color: PAL.WHITE }));
+    s.push(textBox({ x: 1.9, y, w: 4.0, h: 0.82, valign: "middle", runs: c.t, size: 16.5, color: PAL.NAVY, bold: true }));
+    s.push(textBox({ x: 5.9, y, w: 1.7, h: 0.82, valign: "middle", align: "r", runs: ratingLabel(scores[c.key]), size: 12, color: rc, bold: true }));
+    y += 1.0;
+  });
+  s.push(shapeRect({ x: 8.05, y: 1.75, w: 4.3, h: 4.55, fill: PAL.NAVY, rounded: 0.15 }));
+  s.push(textBox({ x: 8.4, y: 2.05, w: 3.6, h: 0.45, runs: "SCORING KEY", size: 14, color: "9FB8CC", bold: true }));
+  const legend = [[PAL.GREEN, "Very good"], [PAL.YELLOW, "Average"], [PAL.RED, "Needs improvement"]];
+  let ly = 2.75;
+  legend.forEach(([c, t]) => {
+    s.push(shapeEllipse({ x: 8.4, y: ly, w: 0.42, h: 0.42, fill: c }));
+    s.push(textBox({ x: 8.98, y: ly - 0.03, w: 3.2, h: 0.48, valign: "middle", runs: t, size: 17, color: PAL.WHITE, bold: true }));
+    ly += 0.85;
+  });
+  s.push(pageFoot(4, TOTAL_SLIDES, state.topic || "Science Fights Review"));
+  return slideXml("Overview", PAL.CREAM, s);
+}
+
+// ==================== 5. SCORECARD ====================
+function buildScorecard(state) {
+  _id = 1;
+  const s = [];
+  s.push(decorCorner(), decor());
+  s.push(shapeRect({ x: 0, y: 0, w: 0.22, h: 7.5, fill: PAL.AMBER }));
+  s.push(textBox({ x: 0.85, y: 0.5, w: 8, h: 0.75, runs: "Scorecard", size: 32, color: PAL.WHITE, bold: true, fontFace: "Cambria" }));
+  s.push(textBox({ x: 0.87, y: 1.15, w: 9, h: 0.45, runs: "At-a-glance rating across every criterion", size: 15, color: "C9DCE8", italic: true }));
+
+  const criteria = [
+    { key: "theory", t: "Theory" }, { key: "experiment", t: "Experiment" }, { key: "results", t: "Results" },
+    { key: "agreement", t: "Agreement" }, { key: "conclusions", t: "Conclusions" },
+  ];
+  const scores = state.scores || {};
+  const order = { good: 3, avg: 2, bad: 1 };
+  const scored = criteria.map(c => order[scores[c.key]] || 0).filter(v => v > 0);
+  const avg = scored.length ? scored.reduce((a, b) => a + b, 0) / scored.length : 0;
+  const overallColor = avg === 0 ? "C9C2AE" : avg >= 2.5 ? PAL.GREEN : avg >= 1.6 ? PAL.YELLOW : PAL.RED;
+  const overallLabel = avg === 0 ? "Not scored" : avg >= 2.5 ? "Strong overall" : avg >= 1.6 ? "Solid, room to grow" : "Needs real work";
+
+  let y = 1.95;
+  const barMaxW = 5.9;
+  criteria.forEach(c => {
+    const v = order[scores[c.key]] || 0;
+    const rc = ratingColor(scores[c.key]);
+    s.push(textBox({ x: 0.85, y: y + 0.06, w: 2.15, h: 0.6, valign: "middle", runs: c.t, size: 17, color: PAL.WHITE, bold: true }));
+    s.push(shapeRect({ x: 3.15, y: y + 0.09, w: barMaxW, h: 0.52, fill: PAL.NAVY_DEEP, rounded: 0.12 }));
+    const fillW = v > 0 ? Math.max(0.5, (barMaxW * v) / 3) : 0.08;
+    s.push(shapeRect({ x: 3.15, y: y + 0.09, w: fillW, h: 0.52, fill: rc, rounded: 0.12 }));
+    y += 0.66;
+  });
+
+  s.push(shapeRect({ x: 0.85, y: y + 0.18, w: 11.05, h: 1.22, fill: PAL.NAVY_DEEP, rounded: 0.15, lineColor: overallColor, lineW: 0.025 }));
+  s.push(badgeBg({ x: 1.18, y: y + 0.37, d: 0.82, color: overallColor }));
+  s.push(iconStar({ x: 1.18, y: y + 0.37, d: 0.82, color: PAL.NAVY_DEEP }));
+  s.push(textBox({ x: 2.3, y: y + 0.32, w: 9.3, h: 0.4, runs: "OVERALL IMPRESSION", size: 13, color: "9FB8CC", bold: true }));
+  s.push(textBox({ x: 2.3, y: y + 0.63, w: 9.3, h: 0.55, runs: overallLabel, size: 23, color: PAL.WHITE, bold: true, fontFace: "Cambria" }));
+
+  s.push(pageFootDark(5, TOTAL_SLIDES, state.topic || "Science Fights Review"));
+  return slideXml("Scorecard", PAL.NAVY, s);
+}
+
+// ==================== Reporter / Opponent / Discussion ====================
+function reviewCardSlide({ idx, name, label, labelColor, monogram, good, bad, topic }) {
+  _id = 1;
+  const s = [];
+  s.push(decor());
+  s.push(shapeRect({ x: 0, y: 0, w: 0.22, h: 7.5, fill: labelColor }));
+  s.push(shapeRect({ x: 0.75, y: 0.5, w: 4.1, h: 1.1, fill: labelColor, rounded: 0.17 }));
+  s.push(badgeBg({ x: 0.98, y: 0.665, d: 0.78, color: PAL.NAVY_DEEP }));
+  s.push(iconMonogram({ x: 0.98, y: 0.665, d: 0.78, letter: monogram, color: PAL.WHITE }));
+  s.push(textBox({ x: 1.92, y: 0.5, w: 2.8, h: 1.1, valign: "middle", runs: label, size: 26, color: PAL.WHITE, bold: true, fontFace: "Cambria" }));
+
+  const colY = 2.15;
+  s.push(shapeRect({ x: 0.75, y: colY, w: 5.65, h: 4.15, fill: PAL.WHITE, rounded: 0.13 }));
+  s.push(badgeBg({ x: 1.08, y: colY + 0.35, d: 0.68, color: PAL.GREEN }));
+  s.push(iconCheck({ x: 1.08, y: colY + 0.35, d: 0.68, color: PAL.WHITE }));
+  s.push(textBox({ x: 1.92, y: colY + 0.35, w: 4, h: 0.68, valign: "middle", runs: "Well done", size: 19, color: PAL.GREEN, bold: true }));
+  s.push(bulletList({ x: 1.1, y: colY + 1.25, w: 5.05, h: 2.8, items: good, size: 15 }));
+
+  const cx = 6.85;
+  s.push(shapeRect({ x: cx, y: colY, w: 5.65, h: 4.15, fill: PAL.WHITE, rounded: 0.13 }));
+  s.push(badgeBg({ x: cx + 0.35, y: colY + 0.35, d: 0.68, color: PAL.RED }));
+  s.push(iconX({ x: cx + 0.35, y: colY + 0.35, d: 0.68, color: PAL.WHITE }));
+  s.push(textBox({ x: cx + 1.2, y: colY + 0.35, w: 4, h: 0.68, valign: "middle", runs: "Needs work", size: 19, color: PAL.RED, bold: true }));
+  s.push(bulletList({ x: cx + 0.4, y: colY + 1.25, w: 5.05, h: 2.8, items: bad, size: 15 }));
+
+  s.push(pageFoot(idx, TOTAL_SLIDES, topic || "Science Fights Review"));
+  return slideXml(name, PAL.CREAM, s);
+}
+
+// ==================== 9. CLASH ====================
+function buildClash(state) {
+  _id = 1;
+  const s = [];
+  s.push(decorCorner(), decor());
+  s.push(shapeRect({ x: 0, y: 0, w: 0.22, h: 7.5, fill: PAL.AMBER }));
+  s.push(badgeBg({ x: 0.85, y: 0.5, d: 0.85, color: PAL.AMBER }));
+  s.push(iconClash({ x: 0.85, y: 0.5, d: 0.85, color: PAL.NAVY_DEEP }));
+  s.push(textBox({ x: 1.9, y: 0.5, w: 9, h: 0.85, valign: "middle", runs: "Clash in Discussion", size: 30, color: PAL.WHITE, bold: true, fontFace: "Cambria" }));
+  s.push(shapeRect({ x: 0.85, y: 1.75, w: 11.1, h: 2.7, fill: PAL.NAVY_DEEP, rounded: 0.15, lineColor: PAL.TEAL, lineW: 0.015 }));
+  s.push(textBox({
+    x: 1.25, y: 2.05, w: 10.4, h: 2.2, lnSpcPct: 155, runs: [
+      [{ text: "OPP  ", bold: true, color: PAL.TEAL_LIGHT, size: 14 }, { text: state.oppClaim || "[Opponent's claim not set]", color: "E5EEF6", size: 17 }],
+      [{ text: "REP  ", bold: true, color: PAL.TEAL_LIGHT, size: 14 }, { text: state.repResp || "[Reporter's response not set]", color: "E5EEF6", size: 17 }],
+      [{ text: "VERDICT  ", bold: true, color: PAL.AMBER, size: 14 }, { text: state.verdict || "[Your verdict not set]", color: "E5EEF6", size: 17 }],
+    ],
+  }));
+  s.push(textBox({ x: 0.87, y: 4.75, w: 10, h: 0.4, runs: "This is the moment that usually decides the round \u2014 who defended their physics better?", size: 14, color: "8FAFC7", italic: true }));
+  s.push(pageFootDark(9, TOTAL_SLIDES, state.topic || "Science Fights Review"));
+  return slideXml("Clash", PAL.NAVY, s);
+}
+
+// ==================== 10. FINAL VERDICT ====================
+function buildFinal(state) {
+  _id = 1;
+  const s = [];
+  s.push(decor());
+  s.push(shapeRect({ x: 0, y: 0, w: 0.22, h: 7.5, fill: PAL.AMBER }));
+  s.push(badgeBg({ x: 0.85, y: 0.5, d: 0.9, color: PAL.AMBER }));
+  s.push(iconStar({ x: 0.85, y: 0.5, d: 0.9, color: PAL.NAVY_DEEP }));
+  s.push(textBox({ x: 1.95, y: 0.5, w: 9, h: 0.9, valign: "middle", runs: "Final Verdict", size: 32, color: PAL.NAVY, bold: true, fontFace: "Cambria" }));
+
+  s.push(shapeRect({ x: 0.85, y: 1.85, w: 11.05, h: 2.35, fill: PAL.WHITE, rounded: 0.13 }));
+  s.push(shapeRect({ x: 0.85, y: 1.85, w: 0.12, h: 2.35, fill: PAL.AMBER }));
+  s.push(textBox({ x: 1.35, y: 2.15, w: 10.3, h: 1.85, runs: state.finalVerdict || "[Overall recommendation not set]", size: 18, color: PAL.GREY, lnSpcPct: 145 }));
+
+  s.push(badgeBg({ x: 0.85, y: 6.0, d: 0.75, color: PAL.NAVY }));
+  s.push(iconStar({ x: 0.85, y: 6.0, d: 0.75, color: PAL.AMBER }));
+  s.push(textBox({ x: 1.8, y: 6.05, w: 10, h: 0.75, valign: "middle", runs: "Thank you for your attention", size: 24, color: PAL.NAVY, bold: true, fontFace: "Cambria" }));
+
+  s.push(pageFoot(10, TOTAL_SLIDES, state.topic || "Science Fights Review"));
+  return slideXml("Final Verdict", PAL.CREAM, s);
+}
+
+function buildSlides(state) {
+  const g = (role, pool) => (state[role] && state[role][pool]) ? state[role][pool] : [];
+  const topic = state.topic;
+  return [
+    buildTitle(state),
+    buildAgenda(state),
+    buildTask(state),
+    buildOverview(state),
+    buildScorecard(state),
+    reviewCardSlide({ idx: 6, name: "Reporter", label: "Reporter", labelColor: PAL.TEAL, monogram: "R", good: g("reporter", "good"), bad: g("reporter", "bad"), topic }),
+    reviewCardSlide({ idx: 7, name: "Opponent", label: "Opponent", labelColor: PAL.GREEN, monogram: "O", good: g("opponent", "good"), bad: g("opponent", "bad"), topic }),
+    reviewCardSlide({ idx: 8, name: "Discussion", label: "Discussion", labelColor: PAL.SLATE, monogram: "D", good: g("discussion", "good"), bad: g("discussion", "bad"), topic }),
+    buildClash(state),
+    buildFinal(state),
+  ];
+}
+
+// ---------- Static package boilerplate ----------
+const CONTENT_TYPES = (n) => `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+<Default Extension="xml" ContentType="application/xml"/>
+<Override PartName="/ppt/presentation.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml"/>
+${Array.from({ length: n }, (_, i) => `<Override PartName="/ppt/slides/slide${i + 1}.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slide+xml"/>`).join("")}
+<Override PartName="/ppt/slideLayouts/slideLayout1.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slideLayout+xml"/>
+<Override PartName="/ppt/slideMasters/slideMaster1.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slideMaster+xml"/>
+<Override PartName="/ppt/theme/theme1.xml" ContentType="application/vnd.openxmlformats-officedocument.theme+xml"/>
+<Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/>
+<Override PartName="/docProps/app.xml" ContentType="application/vnd.openxmlformats-officedocument.extended-properties+xml"/>
+</Types>`;
+
+const ROOT_RELS = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="ppt/presentation.xml"/>
+<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties" Target="docProps/core.xml"/>
+<Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/extended-properties" Target="docProps/app.xml"/>
+</Relationships>`;
+
+const PRES_RELS = (n) => `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+${Array.from({ length: n }, (_, i) => `<Relationship Id="rId${i + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide" Target="slides/slide${i + 1}.xml"/>`).join("")}
+<Relationship Id="rId${n + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideMaster" Target="slideMasters/slideMaster1.xml"/>
+<Relationship Id="rId${n + 2}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme" Target="theme/theme1.xml"/>
+</Relationships>`;
+
+const PRESENTATION_XML = (n) => `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<p:presentation xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">
+<p:sldMasterIdLst><p:sldMasterId id="2147483648" r:id="rId${n + 1}"/></p:sldMasterIdLst>
+<p:sldIdLst>${Array.from({ length: n }, (_, i) => `<p:sldId id="${256 + i}" r:id="rId${i + 1}"/>`).join("")}</p:sldIdLst>
+<p:sldSz cx="12192000" cy="6858000" type="screen16x9"/>
+<p:notesSz cx="6858000" cy="9144000"/>
+</p:presentation>`;
+
+const SLIDE_MASTER = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<p:sldMaster xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">
+<p:cSld><p:bg><p:bgPr><a:solidFill><a:srgbClr val="FFFFFF"/></a:solidFill><a:effectLst/></p:bgPr></p:bg>
+<p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/><a:chOff x="0" y="0"/><a:chExt cx="0" cy="0"/></a:xfrm></p:grpSpPr></p:spTree></p:cSld>
+<p:clrMap bg1="lt1" tx1="dk1" bg2="lt2" tx2="dk2" accent1="accent1" accent2="accent2" accent3="accent3" accent4="accent4" accent5="accent5" accent6="accent6" hlink="hlink" folHlink="folHlink"/>
+<p:sldLayoutIdLst><p:sldLayoutId id="2147483649" r:id="rId1"/></p:sldLayoutIdLst>
+</p:sldMaster>`;
+
+const SLIDE_MASTER_RELS = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideLayout" Target="../slideLayouts/slideLayout1.xml"/>
+<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme" Target="../theme/theme1.xml"/>
+</Relationships>`;
+
+const SLIDE_LAYOUT = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<p:sldLayout xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" type="blank" preserve="1">
+<p:cSld name="Blank"><p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/><a:chOff x="0" y="0"/><a:chExt cx="0" cy="0"/></a:xfrm></p:grpSpPr></p:spTree></p:cSld>
+<p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr>
+</p:sldLayout>`;
+
+const SLIDE_LAYOUT_RELS = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideMaster" Target="../slideMasters/slideMaster1.xml"/>
+</Relationships>`;
+
+const THEME_XML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<a:theme xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" name="FightScorer">
+<a:themeElements>
+<a:clrScheme name="FightScorer">
+<a:dk1><a:sysClr val="windowText" lastClr="000000"/></a:dk1>
+<a:lt1><a:sysClr val="window" lastClr="FFFFFF"/></a:lt1>
+<a:dk2><a:srgbClr val="0B2C4D"/></a:dk2>
+<a:lt2><a:srgbClr val="F7F4EE"/></a:lt2>
+<a:accent1><a:srgbClr val="1381A8"/></a:accent1>
+<a:accent2><a:srgbClr val="F5A524"/></a:accent2>
+<a:accent3><a:srgbClr val="2FA84F"/></a:accent3>
+<a:accent4><a:srgbClr val="D64545"/></a:accent4>
+<a:accent5><a:srgbClr val="5BC4D8"/></a:accent5>
+<a:accent6><a:srgbClr val="E0A11C"/></a:accent6>
+<a:hlink><a:srgbClr val="1381A8"/></a:hlink>
+<a:folHlink><a:srgbClr val="5BC4D8"/></a:folHlink>
+</a:clrScheme>
+<a:fontScheme name="FightScorer">
+<a:majorFont><a:latin typeface="Cambria"/><a:ea typeface=""/><a:cs typeface=""/></a:majorFont>
+<a:minorFont><a:latin typeface="Calibri"/><a:ea typeface=""/><a:cs typeface=""/></a:minorFont>
+</a:fontScheme>
+<a:fmtScheme name="FightScorer">
+<a:fillStyleLst><a:solidFill><a:schemeClr val="accent1"/></a:solidFill><a:solidFill><a:schemeClr val="accent1"/></a:solidFill><a:solidFill><a:schemeClr val="accent1"/></a:solidFill></a:fillStyleLst>
+<a:lnStyleLst><a:ln w="6350"><a:solidFill><a:schemeClr val="accent1"/></a:solidFill></a:ln><a:ln w="12700"><a:solidFill><a:schemeClr val="accent1"/></a:solidFill></a:ln><a:ln w="19050"><a:solidFill><a:schemeClr val="accent1"/></a:solidFill></a:ln></a:lnStyleLst>
+<a:effectStyleLst><a:effectStyle><a:effectLst/></a:effectStyle><a:effectStyle><a:effectLst/></a:effectStyle><a:effectStyle><a:effectLst/></a:effectStyle></a:effectStyleLst>
+<a:bgFillStyleLst><a:solidFill><a:schemeClr val="lt1"/></a:solidFill><a:solidFill><a:schemeClr val="lt1"/></a:solidFill><a:solidFill><a:schemeClr val="lt1"/></a:solidFill></a:bgFillStyleLst>
+</a:fmtScheme>
+</a:themeElements>
+</a:theme>`;
+
+const CORE_XML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+<dc:title>Science Fight Review</dc:title>
+<dc:creator>Fight Scorer</dc:creator>
+</cp:coreProperties>`;
+
+const APP_XML = (n) => `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties" xmlns:vt="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes">
+<Application>Fight Scorer</Application>
+<Slides>${n}</Slides>
+</Properties>`;
+
+function buildZipEntries(state) {
+  const slides = buildSlides(state);
+  const entries = {};
+  entries["[Content_Types].xml"] = CONTENT_TYPES(slides.length);
+  entries["_rels/.rels"] = ROOT_RELS;
+  entries["docProps/core.xml"] = CORE_XML;
+  entries["docProps/app.xml"] = APP_XML(slides.length);
+  entries["ppt/presentation.xml"] = PRESENTATION_XML(slides.length);
+  entries["ppt/_rels/presentation.xml.rels"] = PRES_RELS(slides.length);
+  entries["ppt/slideMasters/slideMaster1.xml"] = SLIDE_MASTER;
+  entries["ppt/slideMasters/_rels/slideMaster1.xml.rels"] = SLIDE_MASTER_RELS;
+  entries["ppt/slideLayouts/slideLayout1.xml"] = SLIDE_LAYOUT;
+  entries["ppt/slideLayouts/_rels/slideLayout1.xml.rels"] = SLIDE_LAYOUT_RELS;
+  entries["ppt/theme/theme1.xml"] = THEME_XML;
+  slides.forEach((xml, i) => { entries[`ppt/slides/slide${i + 1}.xml`] = xml; });
+  return entries;
+}
+
+
+document.getElementById("genBtn").onclick = async () => {
+  const btn = document.getElementById("genBtn");
+  const originalText = btn.textContent;
+  btn.textContent = "Generating...";
+  btn.disabled = true;
+  try {
+    const genState = {
+      topic: state.topic, taskDescription: state.taskDescription, status: state.status,
+      reviewerName: state.reviewerName, scores: state.scores,
+      reporter: { good: [...state.reporter.good], bad: [...state.reporter.bad] },
+      opponent: { good: [...state.opponent.good], bad: [...state.opponent.bad] },
+      discussion: { good: [...state.discussion.good], bad: [...state.discussion.bad] },
+      oppClaim: state.oppClaim, repResp: state.repResp, verdict: state.verdict,
+      finalVerdict: state.finalVerdict,
+    };
+    const entries = buildZipEntries(genState);
+    const zip = new JSZip();
+    Object.entries(entries).forEach(([path, content]) => zip.file(path, content));
+    const blob = await zip.generateAsync({ type: "blob", compression: "DEFLATE" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    const fname = (state.topic || "science_fight_review").toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/(^_|_$)/g, "") || "science_fight_review";
+    a.href = url; a.download = fname + ".pptx";
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
+    showToast("Downloaded — open in PowerPoint or Keynote");
+  } catch (e) {
+    console.error(e);
+    showToast("Generation failed: " + e.message);
+  } finally {
+    btn.textContent = originalText;
+    btn.disabled = false;
+  }
+};
+
+renderScoreRows();
+renderChips();
+refreshSavedList();
+</script>
+</body>
+</html>
