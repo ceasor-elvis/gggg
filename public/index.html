@@ -511,28 +511,30 @@ document.getElementById("autofillBtn").onclick = async () => {
   btn.disabled = true;
   btn.innerHTML = '<span class="spinner"></span> Structuring...';
   try{
-    const prompt = `You are helping a student judge structure their live notes from a "Science Fights" (IYPT-style) physics debate round into a scoring template.
+    const prompt = `You are a professional adjudicator's assistant, rewriting a student judge's rough live notes from a "Science Fights" (IYPT-style) physics debate round into polished, formal review language for a scoring template.
 
 Topic: ${state.topic || "(not given)"}
 Problem statement: ${state.taskDescription || "(not given)"}
 
-Raw judge notes (rough, possibly messy):
+Raw judge notes (rough, casual, possibly abbreviated or in shorthand):
 """
 ${notes}
 """
 
-Extract and organize ONLY what the notes actually support. Do not invent points that aren't implied. Respond with ONLY a raw JSON object (no markdown fences, no commentary) matching exactly this schema:
+Rewrite each point the notes support into concise, professional, third-person adjudication language — the register used in formal competition feedback, not the judge's own casual phrasing. For example, turn "rep model = rigid pendulum, felt weak" into "The theoretical model relied on a rigid-pendulum approximation that was not rigorously justified." Do not copy the judge's informal wording or abbreviations verbatim, and do not invent points the notes don't support.
+
+Respond with ONLY a raw JSON object (no markdown fences, no commentary) matching exactly this schema:
 {
   "scores": {"theory": "good|avg|bad|null", "experiment": "good|avg|bad|null", "results": "good|avg|bad|null", "agreement": "good|avg|bad|null", "conclusions": "good|avg|bad|null"},
-  "reporter": {"good": ["short phrase", ...], "bad": ["short phrase", ...]},
+  "reporter": {"good": ["professionally phrased point", ...], "bad": ["professionally phrased point", ...]},
   "opponent": {"good": [...], "bad": [...]},
   "discussion": {"good": [...], "bad": [...]},
-  "oppClaim": "one sentence or empty string",
-  "repResp": "one sentence or empty string",
-  "verdict": "one sentence verdict on the clash, or empty string",
-  "finalVerdict": "2-3 sentence overall recommendation, or empty string"
+  "oppClaim": "one polished sentence or empty string",
+  "repResp": "one polished sentence or empty string",
+  "verdict": "one polished sentence verdict on the clash, or empty string",
+  "finalVerdict": "2-3 polished sentences, formal adjudicator tone, or empty string"
 }
-Keep each bullet phrase under 12 words. Leave arrays empty and strings empty where notes don't cover it. Use null for any score not mentioned.`;
+Keep each bullet phrase under 14 words, grammatically complete, and free of first-person or casual phrasing. Leave arrays empty and strings empty where notes don't cover it. Use null for any score not mentioned.`;
     const raw = await callAI(prompt);
     const parsed = parseJsonLoose(raw);
 
@@ -571,13 +573,13 @@ document.getElementById("polishBtn").onclick = async () => {
       const b = [...state[role].bad].join("; ") || "none noted";
       return `Well done: ${g}. Needs work: ${b}.`;
     };
-    const prompt = `Write a tight 2-3 sentence "final verdict" paragraph for a physics Science Fight review, in a judge's voice — direct, specific, no fluff.
+    const prompt = `Write a formal 2-3 sentence "final verdict" paragraph for a physics Science Fight adjudication report. Use the register of professional competition feedback — precise, evidence-based, and impartial in tone — not casual or conversational language. Avoid first person and avoid restating the input phrases verbatim; synthesize them into fluent, formal prose a jury chair would sign off on.
 
 Topic: ${state.topic || "(not given)"}
 Reporter — ${summarize("reporter")}
 Opponent — ${summarize("opponent")}
 Discussion — ${summarize("discussion")}
-Clash: Opponent said "${state.oppClaim || "(n/a)"}"; Reporter said "${state.repResp || "(n/a)"}"; judge's take: "${state.verdict || "(n/a)"}"
+Clash: Opponent argued "${state.oppClaim || "(n/a)"}"; Reporter responded "${state.repResp || "(n/a)"}"; adjudicator's assessment: "${state.verdict || "(n/a)"}"
 
 Respond with ONLY the paragraph text, no preamble, no quotes around it.`;
     const raw = await callAI(prompt);
